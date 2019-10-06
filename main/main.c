@@ -13,7 +13,7 @@
 void app_main()
 {
     /* Drivers tasks creation */
-    xTaskCreate(vBUT_Process, "Driver buttons", 2048, NULL, tskIDLE_PRIORITY, NULL);
+    xTaskCreate(vBUT_Process, "Driver buttons", 2048, NULL, tskIDLE_PRIORITY + 1, NULL);
 
     /* Applications tasks creation */
     xTaskCreate(vBUTMNGR_Process, "Buttons manager", 2048, NULL, tskIDLE_PRIORITY, NULL);

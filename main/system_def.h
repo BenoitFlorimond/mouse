@@ -5,12 +5,18 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "esp_log.h"
 #include "esp_system.h"
 
 #include "freertos/FreeRTOS.h"
 
-#include "freertos/task.h"
-
 #include "freertos/queue.h"
+#include "freertos/semphr.h"
+#include "freertos/task.h"
+#include "freertos/timers.h"
+
+#include "osUtils.h"
+
+#define WRITE_IN_QUEUE_DEFAULT_TIMEOUT (pdMS_TO_TICKS(10))
 
 #endif //__SYSTEMDEF_H__

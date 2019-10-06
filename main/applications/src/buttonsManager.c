@@ -6,16 +6,41 @@
 ******************************************************************************
 */
 #include "buttonsManager.h"
+#include "buttons.h"
+
+#define BUT_MNGR_TAG ("BUT_MNGR")
+#define BUTTON_GO_GPIO_NUM (GPIO_NUM_25)
+#define BUTTON_FORWARD_GPIO_NUM (GPIO_NUM_25)
+#define BUTTON_BACKWARD_GPIO_NUM (GPIO_NUM_25)
+#define BUTTON_LEFT_GPIO_NUM (GPIO_NUM_25)
+#define BUTTON_RIGHT_GPIO_NUM (GPIO_NUM_25)
+
+static QueueHandle_t _buttonManagerQueue = NULL;
 
 void vBUTMNGR_Process(void* pvParameters)
 {
-    printf("Hello world from task!\n");
+    buttonEvent_t buttonEvent = { 0 };
 
-    for (int i = 10; i >= 0; i--) {
-        printf("Mouse restarting in %d seconds...\n", i);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    _buttonManagerQueue = xQueueCreate(10, sizeof(buttonEvent_t));
+    bBUT_RegisterButton(BUTTON_GO_GPIO_NUM, 31, _buttonManagerQueue);
+
+    for (;;) {
+        if (xQueueReceive(_buttonManagerQueue, &buttonEvent, portMAX_DELAY) == pdTRUE) {
+            if (buttonEvent.triggerBitmap & BUTTON_TRIGGER_EDGE_PRESSED) {
+                ESP_LOGI(BUT_MNGR_TAG, "Button %d just pressed", buttonEvent.gpio);
+            }
+            if (buttonEvent.triggerBitmap & BUTTON_TRIGGER_EDGE_RELEASED) {
+                ESP_LOGI(BUT_MNGR_TAG, "Button %d just released", buttonEvent.gpio);
+            }
+            if (buttonEvent.triggerBitmap & BUTTON_TRIGGER_SHORT_PRESS) {
+                ESP_LOGI(BUT_MNGR_TAG, "Button %d short press", buttonEvent.gpio);
+            }
+            if (buttonEvent.triggerBitmap & BUTTON_TRIGGER_LONG_PRESS) {
+                ESP_LOGI(BUT_MNGR_TAG, "Button %d long press", buttonEvent.gpio);
+            }
+            if (buttonEvent.triggerBitmap & BUTTON_TRIGGER_VERY_LONG_PRESS) {
+                ESP_LOGI(BUT_MNGR_TAG, "Button %d very long press", buttonEvent.gpio);
+            }
+        }
     }
-    printf("Restarting now.\n");
-    fflush(stdout);
-    esp_restart();
 }
