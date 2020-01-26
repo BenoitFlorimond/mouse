@@ -3,4 +3,6 @@
 cmake_minimum_required(VERSION 3.5)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+set(EXTRA_COMPONENT_DIRS "main" "main/applications" "main/drivers" "main/utils" "main/hil")
+set(COMPONENT_REQUIRES_COMMON "main")
 project(mouse)
