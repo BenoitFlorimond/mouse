@@ -7,6 +7,7 @@
 */
 #include "buttonsManager.h"
 #include "buttons.h"
+#include "driver/gpio.h"
 
 #define BUT_MNGR_TAG ("BUT_MNGR")
 #define BUTTON_GO_GPIO_NUM (GPIO_NUM_25)
