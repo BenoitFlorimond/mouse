@@ -1,0 +1,158 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "options": {
+        "cwd": "${workspaceRoot}",
+        "env": {
+            "PATH": "${workspaceRoot}\\esp-idf\\tools;C:\\Users\\Benoit\\.espressif\\tools\\cmake\\3.13.4\\bin;C:\\Users\\Benoit\\.espressif\\tools\\mconf\\v4.6.0.0-idf-20190628;C:\\Users\\Benoit\\.espressif\\tools\\ninja\\1.9.0;C:\\Users\\Benoit\\.espressif\\tools\\openocd-esp32\\v0.10.0-esp32-20190313\\openocd-esp32\\bin;C:\\Users\\Benoit\\.espressif\\tools\\xtensa-esp32-elf\\esp-2019r2-8.2.0\\xtensa-esp32-elf\\bin;${env:PATH}",
+            "IDF_PATH": "${workspaceRoot}\\esp-idf",
+        }
+    },
+    "tasks": [
+        {
+            "label": "openocd",
+            "type": "shell",
+            "isBackground": true,
+            "command": "openocd_esp",
+            "args": [
+                "-s",
+                "${workspaceRoot}/zpce_embedded_fwk/config/openocd/scripts",
+                "-c",
+                "\"gdb_port 3334\"",
+                "-f",
+                "board/esp32-wrover-kit-1.8v_4.cfg"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Build",
+            "type": "shell",
+            "command": "idf.py",
+            "args": [
+                "build"
+            ],
+            "problemMatcher": {
+                "base": "$gcc",
+                "fileLocation": [
+                    "relative",
+                    "${workspaceRoot}\\build"
+                ]
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Clean",
+            "type": "shell",
+            "command": "idf.py",
+            "args": [
+                "clean"
+            ],
+            "problemMatcher": {
+                "base": "$gcc",
+                "fileLocation": [
+                    "relative",
+                    "${workspaceRoot}\\build"
+                ]
+            },
+        },
+        {
+            "label": "Clean all",
+            "type": "shell",
+            "command": "idf.py",
+            "args": [
+                "fullclean"
+            ],
+            "problemMatcher": {
+                "base": "$gcc",
+                "fileLocation": [
+                    "relative",
+                    "${workspaceRoot}\\build"
+                ]
+            },
+        },
+        {
+            "label": "Flash",
+            "type": "shell",
+            "command": "idf.py",
+            "args": [
+                "flash",
+                "-p",
+                "COM${input:port}"
+            ],
+            "problemMatcher": {
+                "base": "$gcc",
+                "fileLocation": [
+                    "relative",
+                    "${workspaceRoot}\\build"
+                ]
+            },
+        },
+        {
+            "label": "Monitor",
+            "type": "shell",
+            "command": "start idf.py",
+            "args": [
+                "monitor",
+                "-p",
+                "COM${input:port}"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Simple Monitor",
+            "type": "shell",
+            "command": "start idf_monitor.py",
+            "args": [
+                "monitor",
+                "-p",
+                "COM${input:port}"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Erase",
+            "type": "shell",
+            "command": "idf.py",
+            "args": [
+                "erase_flash",
+                "-p",
+                "COM${input:port}"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Menu config",
+            "type": "shell",
+            "command": "start idf.py",
+            "args": [
+                "menuconfig"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Run requirements",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "-m",
+                "pip",
+                "install",
+                "--user",
+                "-r",
+                "./esp-idf/requirements.txt"
+            ],
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "type": "promptString",
+            "id": "port",
+            "description": "Enter port number"
+        }
+    ]
+}

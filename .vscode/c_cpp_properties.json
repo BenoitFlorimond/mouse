@@ -1,0 +1,19 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "intelliSenseMode": "gcc-x86",
+            "configurationProvider": "go2sh.cmake-integration",
+            "compilerPath": "C:\\msys32\\opt\\xtensa-esp32-elf\\bin\\xtensa-esp32-elf-gcc"
+        }
+    ],
+    "version": 4
+}

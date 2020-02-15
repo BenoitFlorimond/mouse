@@ -1,0 +1,15 @@
+{
+    // "terminal.integrated.shell.windows": "C:/msys32/usr/bin/bash.exe",
+    // "terminal.integrated.shellArgs.windows": [
+    //     "--login",
+    // ],
+    // "terminal.integrated.env.windows": {
+    //     "CHERE_INVOKING": "1",
+    //     "MSYSTEM": "MINGW32",
+    // },
+    "files.associations": {
+        "condition_variable": "cpp",
+        "future": "cpp",
+        "functional": "cpp"
+    }
+}

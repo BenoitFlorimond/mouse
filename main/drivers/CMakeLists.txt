@@ -1,4 +1,5 @@
-set(COMPONENT_SRCS "src/buttons.c" "src/servo.c")
-set(COMPONENT_ADD_INCLUDEDIRS "inc")
 
-register_component()
+idf_component_register( SRCS            "src/buttons.c" 
+                                        "src/servo.c" 
+                        INCLUDE_DIRS    "inc" 
+                        REQUIRES        main)

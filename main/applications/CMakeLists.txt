@@ -1,5 +1,4 @@
-set(COMPONENT_SRCS "src/buttonsManager.c")
-set(COMPONENT_ADD_INCLUDEDIRS "inc")
 
-
-register_component()
+idf_component_register( SRCS            "src/buttonsManager.c" 
+                        INCLUDE_DIRS    "inc"
+                        REQUIRES        main)
