@@ -79,9 +79,7 @@
             "type": "shell",
             "command": "idf.py",
             "args": [
-                "flash",
-                "-p",
-                "COM${input:port}"
+                "flash"
             ],
             "problemMatcher": {
                 "base": "$gcc",
@@ -96,9 +94,7 @@
             "type": "shell",
             "command": "start idf.py",
             "args": [
-                "monitor",
-                "-p",
-                "COM${input:port}"
+                "monitor"
             ],
             "problemMatcher": []
         },
@@ -107,9 +103,7 @@
             "type": "shell",
             "command": "start idf_monitor.py",
             "args": [
-                "monitor",
-                "-p",
-                "COM${input:port}"
+                "monitor"
             ],
             "problemMatcher": []
         },
@@ -118,9 +112,7 @@
             "type": "shell",
             "command": "idf.py",
             "args": [
-                "erase_flash",
-                "-p",
-                "COM${input:port}"
+                "erase_flash"
             ],
             "problemMatcher": []
         },
@@ -146,13 +138,6 @@
                 "./esp-idf/requirements.txt"
             ],
             "problemMatcher": []
-        }
-    ],
-    "inputs": [
-        {
-            "type": "promptString",
-            "id": "port",
-            "description": "Enter port number"
         }
     ]
 }
