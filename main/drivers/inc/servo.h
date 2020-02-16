@@ -26,4 +26,8 @@
 /* Public function prototypes 													*/
 void vSERVO_Process(void* pvParameters);
 
+bool bSERVO_RegisterServo(uint32_t gpio, float minPulseMs, float maxPulseMs);
+
+bool bSERVO_SetOrder(uint32_t gpio, float speed, bool forward);
+
 #endif //__SERVO_H__

@@ -18,5 +18,6 @@
 #include "osUtils.h"
 
 #define WRITE_IN_QUEUE_DEFAULT_TIMEOUT (pdMS_TO_TICKS(10))
+#define TASK_DEFAULT_REPONSE_TIME_TICKS (pdMS_TO_TICKS(100U))
 
 #endif //__SYSTEMDEF_H__
