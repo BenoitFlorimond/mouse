@@ -176,8 +176,7 @@ bool bSERVO_SetOrder(uint32_t gpio, float speed, bool forward)
 
 /* ____________________________________________________________________________ */
 /* Static functions 															*/
-static bool
-getIndexFromGpio(uint32_t gpio, uint8_t* servoIndex)
+static bool getIndexFromGpio(uint32_t gpio, uint8_t* servoIndex)
 {
     bool result = false;
 

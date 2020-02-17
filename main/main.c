@@ -9,6 +9,7 @@
 #include "buttons.h"
 #include "buttonsManager.h"
 #include "esp_spi_flash.h"
+#include "movementManager.h"
 #include "servo.h"
 
 void app_main()
@@ -18,5 +19,6 @@ void app_main()
     xTaskCreate(vSERVO_Process, "Driver servos", 2048, NULL, 6U, NULL);
 
     /* Applications tasks creation */
-    xTaskCreate(vBUTMNGR_Process, "Buttons manager", 2048, NULL, 1U, NULL);
+    xTaskCreate(vBUTMNGR_Process, "Buttons manager", 2048, NULL, 2U, NULL);
+    xTaskCreate(vMVT_Process, "Movement manager", 2048, NULL, 1U, NULL);
 }

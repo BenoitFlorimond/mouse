@@ -7,15 +7,9 @@
 */
 #include "buttonsManager.h"
 #include "buttons.h"
-#include "driver/gpio.h"
+#include "mapping.h"
 
 #define BUT_MNGR_TAG ("BUT_MNGR")
-#define BUTTON_GO_GPIO_NUM (GPIO_NUM_25)
-#define BUTTON_RESET_GPIO_NUM (GPIO_NUM_14)
-#define BUTTON_FORWARD_GPIO_NUM (GPIO_NUM_27)
-#define BUTTON_BACKWARD_GPIO_NUM (GPIO_NUM_33)
-#define BUTTON_LEFT_GPIO_NUM (GPIO_NUM_26)
-#define BUTTON_RIGHT_GPIO_NUM (GPIO_NUM_32)
 
 static QueueHandle_t _buttonManagerQueue = NULL;
 
@@ -33,6 +27,7 @@ void vBUTMNGR_Process(void* pvParameters)
 
     for (;;) {
         if (xQueueReceive(_buttonManagerQueue, &buttonEvent, portMAX_DELAY) == pdTRUE) {
+            ESP_LOGI(BUT_MNGR_TAG, "Button %d trigged an event %d", buttonEvent.gpio, buttonEvent.triggerBitmap);
             switch (buttonEvent.gpio) {
             case BUTTON_GO_GPIO_NUM:
                 break;
@@ -49,22 +44,6 @@ void vBUTMNGR_Process(void* pvParameters)
             default:
                 break;
             }
-
-            // if (buttonEvent.triggerBitmap & BUTTON_TRIGGER_EDGE_PRESSED) {
-            //     ESP_LOGI(BUT_MNGR_TAG, "Button %d just pressed", buttonEvent.gpio);
-            // }
-            // if (buttonEvent.triggerBitmap & BUTTON_TRIGGER_EDGE_RELEASED) {
-            //     ESP_LOGI(BUT_MNGR_TAG, "Button %d just released", buttonEvent.gpio);
-            // }
-            // if (buttonEvent.triggerBitmap & BUTTON_TRIGGER_SHORT_PRESS) {
-            //     ESP_LOGI(BUT_MNGR_TAG, "Button %d short press", buttonEvent.gpio);
-            // }
-            // if (buttonEvent.triggerBitmap & BUTTON_TRIGGER_LONG_PRESS) {
-            //     ESP_LOGI(BUT_MNGR_TAG, "Button %d long press", buttonEvent.gpio);
-            // }
-            // if (buttonEvent.triggerBitmap & BUTTON_TRIGGER_VERY_LONG_PRESS) {
-            //     ESP_LOGI(BUT_MNGR_TAG, "Button %d very long press", buttonEvent.gpio);
-            // }
         }
     }
 }
