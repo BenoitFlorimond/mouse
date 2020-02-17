@@ -92,7 +92,7 @@
         {
             "label": "Monitor",
             "type": "shell",
-            "command": "start idf.py",
+            "command": "idf.py",
             "args": [
                 "monitor"
             ],

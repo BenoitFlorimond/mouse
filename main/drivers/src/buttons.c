@@ -114,6 +114,7 @@ void vBUT_Process(void* pvParameters)
     uint8_t buttonCounter = 0;
     uint32_t currentEventsTriggered = BUTTON_TRIGGER_NONE;
     bool result = false;
+    static bool _isrServiceInstalled = false;
 
     _queueForButtons = xQueueCreate(10, sizeof(buttonEvent));
 
@@ -136,7 +137,9 @@ void vBUT_Process(void* pvParameters)
                     gpioConfig.pull_up_en = GPIO_PULLUP_DISABLE;
                     gpioConfig.intr_type = GPIO_INTR_ANYEDGE;
                     gpio_config(&gpioConfig);
-                    gpio_install_isr_service(0); //TODO: check param
+                    if (!_isrServiceInstalled) {
+                        _isrServiceInstalled = (gpio_install_isr_service(0) == ESP_OK);
+                    }
                     gpio_isr_handler_add(buttonEvent.config.gpio, _buttonsISR, (void*)buttonEvent.config.gpio);
                     result = true;
                 } else {
