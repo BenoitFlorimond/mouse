@@ -33,8 +33,6 @@ typedef enum {
 /* Public function prototypes 													*/
 void vMVT_Process(void* pvParameters);
 
-void vMVT_Move(movementType_e movement);
-
-void vMVT_EmergencyStop(void);
+void vMVT_Move(movementType_e movement, void (*endCallback)(void));
 
 #endif //__MOVEMENTMANAGER_H__

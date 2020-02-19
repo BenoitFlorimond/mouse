@@ -32,6 +32,10 @@
 
 /* ____________________________________________________________________________ */
 /* Struct																		*/
+typedef struct {
+    movementType_e movement;
+    void (*endCallback)(void);
+} movementEvent_t;
 
 /* ____________________________________________________________________________ */
 /* Static prototypes 															*/
@@ -49,7 +53,8 @@ static TimerHandle_t _timerForMovement = NULL;
 /* Public functions 															*/
 void vMVT_Process(void* pvParameters)
 {
-    movementType_e movementEvent = { 0 };
+    static void (*_endCallbackToCall)(void) = NULL;
+    movementEvent_t movementEvent = { 0 };
 
     _queueForMovement = xQueueCreate(5U, sizeof(movementEvent));
     _timerForMovement = xTimerCreate("Timer to end movement", FORWARD_DELAY_TICKS, pdFALSE, NULL, _endMovementTimerCallback);
@@ -60,53 +65,61 @@ void vMVT_Process(void* pvParameters)
     for (;;) {
         xQueueReceive(_queueForMovement, &movementEvent, portMAX_DELAY);
 
-        switch (movementEvent) {
+        switch (movementEvent.movement) {
         case MOVEMENT_STOP:
+            xTimerStop(_timerForMovement, TIMER_API_DEFAULT_TIMEOUT);
             bSERVO_SetOrder(SERVO_LEFT_GPIO_NUM, SPEED_STOP, true);
             bSERVO_SetOrder(SERVO_RIGHT_GPIO_NUM, SPEED_STOP, true);
-            xTimerStop(_timerForMovement, TIMER_API_DEFAULT_TIMEOUT);
+            if (_endCallbackToCall != NULL) {
+                _endCallbackToCall();
+            }
             break;
         case MOVEMENT_FORWARD:
-            bSERVO_SetOrder(SERVO_LEFT_GPIO_NUM, SPEED_FORWARD, true);
-            bSERVO_SetOrder(SERVO_RIGHT_GPIO_NUM, SPEED_FORWARD, true);
             xTimerChangePeriod(_timerForMovement, FORWARD_DELAY_TICKS, TIMER_API_DEFAULT_TIMEOUT);
             xTimerReset(_timerForMovement, TIMER_API_DEFAULT_TIMEOUT);
+            bSERVO_SetOrder(SERVO_LEFT_GPIO_NUM, SPEED_FORWARD, true);
+            bSERVO_SetOrder(SERVO_RIGHT_GPIO_NUM, SPEED_FORWARD, true);
             break;
         case MOVEMENT_BACKWARD:
-            bSERVO_SetOrder(SERVO_LEFT_GPIO_NUM, SPEED_BACKWARD, false);
-            bSERVO_SetOrder(SERVO_RIGHT_GPIO_NUM, SPEED_BACKWARD, false);
             xTimerChangePeriod(_timerForMovement, BACKWARD_DELAY_TICKS, TIMER_API_DEFAULT_TIMEOUT);
             xTimerReset(_timerForMovement, TIMER_API_DEFAULT_TIMEOUT);
+            bSERVO_SetOrder(SERVO_LEFT_GPIO_NUM, SPEED_BACKWARD, false);
+            bSERVO_SetOrder(SERVO_RIGHT_GPIO_NUM, SPEED_BACKWARD, false);
             break;
         case MOVEMENT_ROTATION_LEFT:
+            xTimerChangePeriod(_timerForMovement, ROTATION_DELAY_TICKS, TIMER_API_DEFAULT_TIMEOUT);
+            xTimerReset(_timerForMovement, TIMER_API_DEFAULT_TIMEOUT);
             bSERVO_SetOrder(SERVO_LEFT_GPIO_NUM, SPEED_ROTATION, false);
             bSERVO_SetOrder(SERVO_RIGHT_GPIO_NUM, SPEED_ROTATION, true);
-            xTimerChangePeriod(_timerForMovement, ROTATION_DELAY_TICKS, TIMER_API_DEFAULT_TIMEOUT);
-            xTimerReset(_timerForMovement, TIMER_API_DEFAULT_TIMEOUT);
             break;
         case MOVEMENT_ROTATION_RIGHT:
-            bSERVO_SetOrder(SERVO_LEFT_GPIO_NUM, SPEED_ROTATION, true);
-            bSERVO_SetOrder(SERVO_RIGHT_GPIO_NUM, SPEED_ROTATION, false);
             xTimerChangePeriod(_timerForMovement, ROTATION_DELAY_TICKS, TIMER_API_DEFAULT_TIMEOUT);
             xTimerReset(_timerForMovement, TIMER_API_DEFAULT_TIMEOUT);
+            bSERVO_SetOrder(SERVO_LEFT_GPIO_NUM, SPEED_ROTATION, true);
+            bSERVO_SetOrder(SERVO_RIGHT_GPIO_NUM, SPEED_ROTATION, false);
             break;
         default:
             break;
         }
+
+        _endCallbackToCall = movementEvent.endCallback;
     }
 }
 
-void vMVT_Move(movementType_e movement)
+void vMVT_Move(movementType_e movement, void (*endCallback)(void))
 {
-    xQueueSend(_queueForMovement, &movement, WRITE_IN_QUEUE_DEFAULT_TIMEOUT);
-}
+    movementEvent_t event;
 
-void vMVT_EmergencyStop(void)
-{
-    movementType_e movement = MOVEMENT_STOP;
+    event.movement = movement;
+    event.endCallback = endCallback;
 
-    xQueueReset(_queueForMovement);
-    xQueueSendToFront(_queueForMovement, &movement, 0U);
+    if (movement == MOVEMENT_STOP) {
+        xTimerStop(_timerForMovement, TIMER_API_DEFAULT_TIMEOUT);
+        xQueueReset(_queueForMovement);
+        xQueueSendToFront(_queueForMovement, &movement, WRITE_IN_QUEUE_DEFAULT_TIMEOUT);
+    } else {
+        xQueueSend(_queueForMovement, &movement, WRITE_IN_QUEUE_DEFAULT_TIMEOUT);
+    }
 }
 
 /* ____________________________________________________________________________ */
@@ -114,7 +127,10 @@ void vMVT_EmergencyStop(void)
 
 static void _endMovementTimerCallback(void* timer)
 {
-    movementType_e movement = MOVEMENT_STOP;
+    movementEvent_t event;
 
-    xQueueSendToFront(_queueForMovement, &movement, 0U);
+    event.movement = MOVEMENT_STOP;
+    event.endCallback = NULL;
+
+    xQueueSend(_queueForMovement, &event, 0U);
 }
