@@ -8,6 +8,7 @@
 #include "buttonsManager.h"
 #include "buttons.h"
 #include "mapping.h"
+#include "sequenceManager.h"
 
 #define BUT_MNGR_TAG ("BUT_MNGR")
 
@@ -30,16 +31,22 @@ void vBUTMNGR_Process(void* pvParameters)
             ESP_LOGI(BUT_MNGR_TAG, "Button %d trigged an event %d", buttonEvent.gpio, buttonEvent.triggerBitmap);
             switch (buttonEvent.gpio) {
             case BUTTON_GO_GPIO_NUM:
+                vSEQMNGR_LaunchSequence();
                 break;
             case BUTTON_RESET_GPIO_NUM:
+                vSEQMNGR_RemoveLastMovement();
                 break;
             case BUTTON_FORWARD_GPIO_NUM:
+                vSEQMNGR_AddNewMovement(MOVEMENT_FORWARD);
                 break;
             case BUTTON_BACKWARD_GPIO_NUM:
+                vSEQMNGR_AddNewMovement(MOVEMENT_BACKWARD);
                 break;
             case BUTTON_LEFT_GPIO_NUM:
+                vSEQMNGR_AddNewMovement(MOVEMENT_ROTATION_LEFT);
                 break;
             case BUTTON_RIGHT_GPIO_NUM:
+                vSEQMNGR_AddNewMovement(MOVEMENT_ROTATION_RIGHT);
                 break;
             default:
                 break;

@@ -116,9 +116,9 @@ void vMVT_Move(movementType_e movement, void (*endCallback)(void))
     if (movement == MOVEMENT_STOP) {
         xTimerStop(_timerForMovement, TIMER_API_DEFAULT_TIMEOUT);
         xQueueReset(_queueForMovement);
-        xQueueSendToFront(_queueForMovement, &movement, WRITE_IN_QUEUE_DEFAULT_TIMEOUT);
+        xQueueSendToFront(_queueForMovement, &event, WRITE_IN_QUEUE_DEFAULT_TIMEOUT);
     } else {
-        xQueueSend(_queueForMovement, &movement, WRITE_IN_QUEUE_DEFAULT_TIMEOUT);
+        xQueueSend(_queueForMovement, &event, WRITE_IN_QUEUE_DEFAULT_TIMEOUT);
     }
 }
 

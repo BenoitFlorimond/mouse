@@ -12,6 +12,7 @@
 
 /* ____________________________________________________________________________ */
 /* Defines  																	*/
+#define SEQ_MNGR_TAG ("SEQ_MNGR")
 #define SEQUENCE_MAX_SIZE (50U)
 
 /* ____________________________________________________________________________ */
@@ -59,27 +60,37 @@ void vSEQMNGR_Process(void* pvParameters)
         switch (event.type) {
         case ADD_NEW_MOVEMENT:
             _sequence[_sequenceLength++] = event.movement;
+            ESP_LOGI(SEQ_MNGR_TAG, "New movement added: %d (%d steps)", event.movement, _sequenceLength);
             break;
         case REMOVE_LAST_MOVEMENT:
             if (_sequenceLength > 0U) {
                 _sequenceLength--;
+                ESP_LOGI(SEQ_MNGR_TAG, "Last movement has been removed (%d steps left)", _sequenceLength);
+            } else {
+                ESP_LOGE(SEQ_MNGR_TAG, "Impossible to remove last movement, sequence is empty");
             }
             break;
         case ABORT_SEQUENCE:
             vMVT_Move(MOVEMENT_STOP, NULL);
             _sequenceLength = 0U;
+            ESP_LOGI(SEQ_MNGR_TAG, "Sequence aborted");
             break;
         case LAUNCH_SEQUENCE:
             _sequenceReadIndex = 0U;
             if (_sequenceLength > 0U) {
                 vMVT_Move(_sequence[_sequenceReadIndex++], endOfMovementCallback);
+                ESP_LOGI(SEQ_MNGR_TAG, "Sequence launched (%d steps)", _sequenceLength);
+            } else {
+                ESP_LOGE(SEQ_MNGR_TAG, "Impossible to launch sequence, it is empty");
             }
             break;
         case END_OF_CURRENT_MOVEMENT:
-            if (_sequenceReadIndex <= _sequenceLength) {
+            if (_sequenceReadIndex < _sequenceLength) {
+                ESP_LOGI(SEQ_MNGR_TAG, "Next movement: %d (index %d)", _sequence[_sequenceReadIndex], _sequenceReadIndex);
                 vMVT_Move(_sequence[_sequenceReadIndex++], endOfMovementCallback);
             } else {
                 _sequenceReadIndex = 0U;
+                ESP_LOGI(SEQ_MNGR_TAG, "END OF SEQUENCE");
             }
             break;
         default:

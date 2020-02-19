@@ -14,14 +14,14 @@
             "label": "openocd",
             "type": "shell",
             "isBackground": true,
-            "command": "openocd_esp",
+            "command": "openocd",
             "args": [
                 "-s",
-                "${workspaceRoot}/zpce_embedded_fwk/config/openocd/scripts",
+                "C:/Users/Benoit/.espressif/tools/openocd-esp32/v0.10.0-esp32-20190313/openocd-esp32/share/openocd/scripts",
                 "-c",
                 "\"gdb_port 3334\"",
                 "-f",
-                "board/esp32-wrover-kit-1.8v_4.cfg"
+                "board/esp32-wrover.cfg"
             ],
             "problemMatcher": []
         },
