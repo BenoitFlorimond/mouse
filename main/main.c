@@ -10,15 +10,17 @@
 #include "buttonsManager.h"
 #include "esp_spi_flash.h"
 #include "movementManager.h"
+#include "sequenceManager.h"
 #include "servo.h"
 
 void app_main()
 {
     /* Drivers tasks creation */
-    xTaskCreate(vBUT_Process, "Driver buttons", 2048, NULL, 7U, NULL);
-    xTaskCreate(vSERVO_Process, "Driver servos", 2048, NULL, 6U, NULL);
+    xTaskCreate(vBUT_Process, "Driver buttons", 2048U, NULL, 7U, NULL);
+    xTaskCreate(vSERVO_Process, "Driver servos", 2048U, NULL, 6U, NULL);
 
     /* Applications tasks creation */
-    xTaskCreate(vBUTMNGR_Process, "Buttons manager", 2048, NULL, 2U, NULL);
-    xTaskCreate(vMVT_Process, "Movement manager", 2048, NULL, 1U, NULL);
+    xTaskCreate(vBUTMNGR_Process, "Buttons manager", 2048U, NULL, 3U, NULL);
+    xTaskCreate(vMVT_Process, "Movement manager", 2048U, NULL, 2U, NULL);
+    xTaskCreate(vSEQMNGR_Process, "Sequence manager", 2048U, NULL, 1U, NULL);
 }
