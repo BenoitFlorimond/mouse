@@ -25,6 +25,7 @@ void vBUTMNGR_Process(void* pvParameters)
     bBUT_RegisterButton(BUTTON_BACKWARD_GPIO_NUM, BUTTON_TRIGGER_EDGE_PRESSED, _buttonManagerQueue);
     bBUT_RegisterButton(BUTTON_LEFT_GPIO_NUM, BUTTON_TRIGGER_EDGE_PRESSED, _buttonManagerQueue);
     bBUT_RegisterButton(BUTTON_RIGHT_GPIO_NUM, BUTTON_TRIGGER_EDGE_PRESSED, _buttonManagerQueue);
+    bBUT_RegisterButton(BUTTON_BACK_GPIO_NUM, BUTTON_TRIGGER_EDGE_PRESSED, _buttonManagerQueue);
 
     for (;;) {
         if (xQueueReceive(_buttonManagerQueue, &buttonEvent, portMAX_DELAY) == pdTRUE) {
@@ -33,8 +34,11 @@ void vBUTMNGR_Process(void* pvParameters)
             case BUTTON_GO_GPIO_NUM:
                 vSEQMNGR_LaunchSequence();
                 break;
-            case BUTTON_RESET_GPIO_NUM:
+            case BUTTON_BACK_GPIO_NUM:
                 vSEQMNGR_RemoveLastMovement();
+                break;
+            case BUTTON_RESET_GPIO_NUM:
+                vSEQMNGR_AbortSequence();
                 break;
             case BUTTON_FORWARD_GPIO_NUM:
                 vSEQMNGR_AddNewMovement(MOVEMENT_FORWARD);
