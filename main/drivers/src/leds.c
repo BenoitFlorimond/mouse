@@ -23,10 +23,12 @@
 #define MAX_PINS_PER_LED (3)
 
 #define GET_SINGLE_COLOR_FROM_RGB(rgb, index) (((rgb) >> (16 - 8 * index)) & 0xFF)
-
+#define LED_COLOR_BLACK (0)
 #define RED_GAIN (1.0)
 #define GREEN_GAIN (0.5)
 #define BLUE_GAIN (1.0)
+
+#define CHECK_BLINKING_PERIOD_TICKS (pdMS_TO_TICKS(100))
 
 /* ____________________________________________________________________________ */
 /* Enum  																		*/
@@ -34,37 +36,47 @@ typedef enum {
     EVENT_REGISTER,
     EVENT_SET_SOLID,
     EVENT_SET_BLINKING,
+    EVENT_SET_FLASH,
+    EVENT_CHECK_LEDS,
     EVENT_SET_OFF,
 } ledEvent_e;
 
 /* ____________________________________________________________________________ */
 /* Struct																		*/
 typedef struct {
-    uint8_t ledHandle;
     uint32_t rGpio;
     uint32_t gGpio;
     uint32_t bGpio;
 } ledConfig_t;
 
 typedef struct {
-    uint8_t ledHandle;
     uint32_t rgbColor;
     bool fade;
     uint32_t delayToFade;
+    blinkType_e blinkType;
     uint32_t blinkPeriodMs;
 } ledParam_t;
 
 typedef struct {
     ledEvent_e type;
     queueContext_t responseQueue;
+    uint8_t ledHandle;
     union {
         ledConfig_t config;
         ledParam_t params;
     };
 } ledEvent_t;
 
+typedef struct {
+    ledParam_t ledParams;
+    uint32_t nextActionTimestamp;
+    uint32_t nextColor;
+} ledBlinkContext_t;
+
 /* ____________________________________________________________________________ */
 /* Static prototypes 															*/
+static void _blinkingTimerCallback(TimerHandle_t timer);
+static void _setLed(uint8_t handle, uint32_t rgbColor, bool fade, uint32_t fadeDelayMs);
 
 /* ____________________________________________________________________________ */
 /* Static variables 															*/
@@ -88,6 +100,8 @@ static ledc_channel_config_t _channelConfig = {
 };
 static uint8_t _ledIndex = 0;
 static float _gainPerColor[MAX_PINS_PER_LED] = { RED_GAIN, GREEN_GAIN, BLUE_GAIN };
+static TimerHandle_t _blinkingTimer = NULL;
+static ledBlinkContext_t _ledsContext[MAX_REGISTERED_LEDS] = { 0 };
 
 /* ____________________________________________________________________________ */
 /* ISR handlers 																*/
@@ -99,8 +113,10 @@ void vLED_Process(void* pvParameters)
 {
     ledEvent_t event = { 0 };
     _queueForLeds = xQueueCreate(10, sizeof(ledEvent_t));
-    uint8_t colorIndex = 0;
-    uint32_t dutyCycle = 0;
+    uint8_t ledIndex = 0;
+    bool atLeastOneLedBlinking = false;
+
+    _blinkingTimer = xTimerCreate("Blink timer", CHECK_BLINKING_PERIOD_TICKS, pdTRUE, NULL, _blinkingTimerCallback);
 
     ledc_timer_config(&_ledTimer);
     ledc_fade_func_install(0);
@@ -129,24 +145,42 @@ void vLED_Process(void* pvParameters)
             _ledIndex++;
             break;
 
+        case EVENT_SET_BLINKING:
+            memcpy(&_ledsContext[event.ledHandle].ledParams, &event.params, sizeof(event.params));
+            _ledsContext[event.ledHandle].nextActionTimestamp = xTaskGetTickCount() + pdMS_TO_TICKS(_ledsContext[event.ledHandle].ledParams.blinkPeriodMs / 2);
+            _ledsContext[event.ledHandle].nextColor = LED_COLOR_BLACK;
+            if (xTimerIsTimerActive(_blinkingTimer) == pdFALSE) {
+                xTimerReset(_blinkingTimer, TASK_DEFAULT_REPONSE_TIME_TICKS);
+            }
+            _setLed(event.ledHandle, event.params.rgbColor, event.params.fade, event.params.delayToFade);
+            break;
+
         case EVENT_SET_SOLID:
-            for (colorIndex = 0; colorIndex < MAX_PINS_PER_LED; colorIndex++) {
-                if (_ledChannels[event.params.ledHandle][colorIndex] < LEDC_CHANNEL_MAX) {
-                    dutyCycle = _gainPerColor[colorIndex] * GET_SINGLE_COLOR_FROM_RGB(event.params.rgbColor, colorIndex) * BIT(LEDC_TIMER_13_BIT) / 0xFF;
-                    if (event.params.fade) {
-                        ledc_set_fade_with_time(LEDC_HIGH_SPEED_MODE, _ledChannels[event.params.ledHandle][colorIndex], dutyCycle, event.params.delayToFade);
-                        ledc_fade_start(LEDC_HIGH_SPEED_MODE, _ledChannels[event.params.ledHandle][colorIndex], LEDC_FADE_NO_WAIT);
-                    } else {
-                        ledc_set_duty(LEDC_HIGH_SPEED_MODE, _ledChannels[event.params.ledHandle][colorIndex], dutyCycle);
-                        ledc_update_duty(LEDC_HIGH_SPEED_MODE, _ledChannels[event.params.ledHandle][colorIndex]);
+            _ledsContext[event.ledHandle].ledParams.blinkType = BLINK_TYPE_NONE;
+            _setLed(event.ledHandle, event.params.rgbColor, event.params.fade, event.params.delayToFade);
+            break;
+
+        case EVENT_CHECK_LEDS:
+            atLeastOneLedBlinking = false;
+            for (ledIndex = 0; ledIndex < MAX_REGISTERED_LEDS; ledIndex++) {
+                if (_ledsContext[ledIndex].ledParams.blinkType != BLINK_TYPE_NONE) {
+                    atLeastOneLedBlinking = true;
+                    if (xTaskGetTickCount() > _ledsContext[ledIndex].nextActionTimestamp) {
+                        _setLed(ledIndex, _ledsContext[ledIndex].nextColor, _ledsContext[ledIndex].ledParams.fade, _ledsContext[ledIndex].ledParams.delayToFade);
+                        if (_ledsContext[ledIndex].ledParams.blinkType == BLINK_TYPE_ONCE) {
+                            _ledsContext[ledIndex].ledParams.blinkType = BLINK_TYPE_NONE;
+                        } else {
+                            _ledsContext[ledIndex].nextActionTimestamp = xTaskGetTickCount() + pdMS_TO_TICKS(_ledsContext[ledIndex].ledParams.blinkPeriodMs / 2);
+                            _ledsContext[ledIndex].nextColor = (_ledsContext[ledIndex].nextColor == LED_COLOR_BLACK) ? _ledsContext[ledIndex].ledParams.rgbColor : LED_COLOR_BLACK;
+                        }
                     }
                 }
             }
+            if (!atLeastOneLedBlinking) {
+                xTimerStop(_blinkingTimer, TASK_DEFAULT_REPONSE_TIME_TICKS);
+            }
             break;
-        case EVENT_SET_BLINKING:
-            break;
-        case EVENT_SET_OFF:
-            break;
+
         default:
             break;
         }
@@ -171,25 +205,65 @@ uint8_t u8LED_RegisterLed(uint32_t rGpio, uint32_t gGpio, uint32_t bGpio)
     return ledHandle;
 }
 
-void vLED_SetLedSolid(uint8_t ledHandle, uint32_t rgbColor, bool fade, uint32_t delayToFadeMs)
+void vLED_SetLedSolid(uint8_t ledHandle, uint32_t color, bool fade, uint32_t delayToFadeMs)
 {
     ledEvent_t event = { 0 };
 
     event.type = EVENT_SET_SOLID;
-    event.params.ledHandle = ledHandle;
-    event.params.rgbColor = rgbColor;
+    event.ledHandle = ledHandle;
+    event.params.rgbColor = color;
     event.params.fade = fade;
     event.params.delayToFade = delayToFadeMs;
 
     xQueueSend(_queueForLeds, &event, WRITE_IN_QUEUE_DEFAULT_TIMEOUT);
 }
 
-void vLED_SetLedBlinking(uint8_t ledHandle, uint32_t color, uint32_t periodMs, bool fade, uint32_t delayToFadeMs)
+void vLED_SetLedBlinking(uint8_t ledHandle, uint32_t color, bool fade, uint32_t delayToFadeMs, uint32_t periodMs, blinkType_e blinkType)
 {
+    ledEvent_t event = { 0 };
+
+    event.type = EVENT_SET_BLINKING;
+    event.ledHandle = ledHandle;
+    event.params.rgbColor = color;
+    event.params.blinkPeriodMs = periodMs;
+    event.params.blinkType = blinkType;
+    event.params.fade = fade;
+    event.params.delayToFade = delayToFadeMs;
+
+    xQueueSend(_queueForLeds, &event, WRITE_IN_QUEUE_DEFAULT_TIMEOUT);
 }
 
-void vLED_SetLedOff(uint8_t ledHandle)
+void vLED_SetLedOff(uint8_t ledHandle, bool fade, uint32_t delayToFadeMs)
 {
+    vLED_SetLedSolid(ledHandle, LED_COLOR_BLACK, fade, delayToFadeMs);
 }
 /* ____________________________________________________________________________ */
 /* Static functions 															*/
+
+static void _setLed(uint8_t handle, uint32_t rgbColor, bool fade, uint32_t fadeDelayMs)
+{
+    uint8_t colorIndex = 0;
+    uint32_t dutyCycle = 0;
+
+    for (colorIndex = 0; colorIndex < MAX_PINS_PER_LED; colorIndex++) {
+        if (_ledChannels[handle][colorIndex] < LEDC_CHANNEL_MAX) {
+            dutyCycle = _gainPerColor[colorIndex] * GET_SINGLE_COLOR_FROM_RGB(rgbColor, colorIndex) * BIT(LEDC_TIMER_13_BIT) / 0xFF;
+            if (fade) {
+                ledc_set_fade_with_time(LEDC_HIGH_SPEED_MODE, _ledChannels[handle][colorIndex], dutyCycle, fadeDelayMs);
+                ledc_fade_start(LEDC_HIGH_SPEED_MODE, _ledChannels[handle][colorIndex], LEDC_FADE_NO_WAIT);
+            } else {
+                ledc_set_duty(LEDC_HIGH_SPEED_MODE, _ledChannels[handle][colorIndex], dutyCycle);
+                ledc_update_duty(LEDC_HIGH_SPEED_MODE, _ledChannels[handle][colorIndex]);
+            }
+        }
+    }
+}
+
+static void _blinkingTimerCallback(TimerHandle_t timer)
+{
+    ledEvent_t event = { 0 };
+
+    event.type = EVENT_CHECK_LEDS;
+
+    xQueueSend(_queueForLeds, &event, 0);
+}
