@@ -75,7 +75,6 @@ typedef struct {
 
 /* ____________________________________________________________________________ */
 /* Static prototypes 															*/
-static void _blinkingTimerCallback(TimerHandle_t timer);
 static void _setLed(uint8_t handle, uint32_t rgbColor, bool fade, uint32_t fadeDelayMs);
 
 /* ____________________________________________________________________________ */
@@ -100,7 +99,6 @@ static ledc_channel_config_t _channelConfig = {
 };
 static uint8_t _ledIndex = 0;
 static float _gainPerColor[MAX_PINS_PER_LED] = { RED_GAIN, GREEN_GAIN, BLUE_GAIN };
-static TimerHandle_t _blinkingTimer = NULL;
 static ledBlinkContext_t _ledsContext[MAX_REGISTERED_LEDS] = { 0 };
 
 /* ____________________________________________________________________________ */
@@ -115,74 +113,70 @@ void vLED_Process(void* pvParameters)
     _queueForLeds = xQueueCreate(10, sizeof(ledEvent_t));
     uint8_t ledIndex = 0;
     bool atLeastOneLedBlinking = false;
-
-    _blinkingTimer = xTimerCreate("Blink timer", CHECK_BLINKING_PERIOD_TICKS, pdTRUE, NULL, _blinkingTimerCallback);
+    TickType_t ticksToBlock = portMAX_DELAY;
 
     ledc_timer_config(&_ledTimer);
     ledc_fade_func_install(0);
 
     for (;;) {
-        xQueueReceive(_queueForLeds, &event, portMAX_DELAY);
+        if (xQueueReceive(_queueForLeds, &event, ticksToBlock) == pdTRUE) {
+            switch (event.type) {
+            case EVENT_REGISTER:
+                if ((event.config.rGpio != LED_NO_PIN) && (_channelConfig.channel < LEDC_CHANNEL_MAX)) {
+                    _channelConfig.gpio_num = event.config.rGpio;
+                    ledc_channel_config(&_channelConfig);
+                    _ledChannels[_ledIndex][PIN_RED_INDEX] = _channelConfig.channel++;
+                }
+                if ((event.config.gGpio != LED_NO_PIN) && (_channelConfig.channel < LEDC_CHANNEL_MAX)) {
+                    _channelConfig.gpio_num = event.config.gGpio;
+                    ledc_channel_config(&_channelConfig);
+                    _ledChannels[_ledIndex][PIN_GREEN_INDEX] = _channelConfig.channel++;
+                }
+                if ((event.config.bGpio != LED_NO_PIN) && (_channelConfig.channel < LEDC_CHANNEL_MAX)) {
+                    _channelConfig.gpio_num = event.config.bGpio;
+                    ledc_channel_config(&_channelConfig);
+                    _ledChannels[_ledIndex][PIN_BLUE_INDEX] = _channelConfig.channel++;
+                }
+                vOS_QueueSendSafe(&event.responseQueue, &_ledIndex);
+                _ledIndex++;
+                break;
 
-        switch (event.type) {
-        case EVENT_REGISTER:
-            if ((event.config.rGpio != LED_NO_PIN) && (_channelConfig.channel < LEDC_CHANNEL_MAX)) {
-                _channelConfig.gpio_num = event.config.rGpio;
-                ledc_channel_config(&_channelConfig);
-                _ledChannels[_ledIndex][PIN_RED_INDEX] = _channelConfig.channel++;
-            }
-            if ((event.config.gGpio != LED_NO_PIN) && (_channelConfig.channel < LEDC_CHANNEL_MAX)) {
-                _channelConfig.gpio_num = event.config.gGpio;
-                ledc_channel_config(&_channelConfig);
-                _ledChannels[_ledIndex][PIN_GREEN_INDEX] = _channelConfig.channel++;
-            }
-            if ((event.config.bGpio != LED_NO_PIN) && (_channelConfig.channel < LEDC_CHANNEL_MAX)) {
-                _channelConfig.gpio_num = event.config.bGpio;
-                ledc_channel_config(&_channelConfig);
-                _ledChannels[_ledIndex][PIN_BLUE_INDEX] = _channelConfig.channel++;
-            }
-            vOS_QueueSendSafe(&event.responseQueue, &_ledIndex);
-            _ledIndex++;
-            break;
+            case EVENT_SET_BLINKING:
+                memcpy(&_ledsContext[event.ledHandle].ledParams, &event.params, sizeof(event.params));
+                _ledsContext[event.ledHandle].nextActionTimestamp = xTaskGetTickCount() + pdMS_TO_TICKS(_ledsContext[event.ledHandle].ledParams.blinkPeriodMs / 2);
+                _ledsContext[event.ledHandle].nextColor = LED_COLOR_BLACK;
+                ticksToBlock = CHECK_BLINKING_PERIOD_TICKS;
+                _setLed(event.ledHandle, event.params.rgbColor, event.params.fade, event.params.delayToFade);
+                break;
 
-        case EVENT_SET_BLINKING:
-            memcpy(&_ledsContext[event.ledHandle].ledParams, &event.params, sizeof(event.params));
-            _ledsContext[event.ledHandle].nextActionTimestamp = xTaskGetTickCount() + pdMS_TO_TICKS(_ledsContext[event.ledHandle].ledParams.blinkPeriodMs / 2);
-            _ledsContext[event.ledHandle].nextColor = LED_COLOR_BLACK;
-            if (xTimerIsTimerActive(_blinkingTimer) == pdFALSE) {
-                xTimerReset(_blinkingTimer, TASK_DEFAULT_REPONSE_TIME_TICKS);
+            case EVENT_SET_SOLID:
+                _ledsContext[event.ledHandle].ledParams.blinkType = BLINK_TYPE_NONE;
+                _setLed(event.ledHandle, event.params.rgbColor, event.params.fade, event.params.delayToFade);
+                break;
+
+            default:
+                break;
             }
-            _setLed(event.ledHandle, event.params.rgbColor, event.params.fade, event.params.delayToFade);
-            break;
+        }
 
-        case EVENT_SET_SOLID:
-            _ledsContext[event.ledHandle].ledParams.blinkType = BLINK_TYPE_NONE;
-            _setLed(event.ledHandle, event.params.rgbColor, event.params.fade, event.params.delayToFade);
-            break;
-
-        case EVENT_CHECK_LEDS:
-            atLeastOneLedBlinking = false;
-            for (ledIndex = 0; ledIndex < MAX_REGISTERED_LEDS; ledIndex++) {
-                if (_ledsContext[ledIndex].ledParams.blinkType != BLINK_TYPE_NONE) {
-                    atLeastOneLedBlinking = true;
-                    if (xTaskGetTickCount() > _ledsContext[ledIndex].nextActionTimestamp) {
-                        _setLed(ledIndex, _ledsContext[ledIndex].nextColor, _ledsContext[ledIndex].ledParams.fade, _ledsContext[ledIndex].ledParams.delayToFade);
-                        if (_ledsContext[ledIndex].ledParams.blinkType == BLINK_TYPE_ONCE) {
-                            _ledsContext[ledIndex].ledParams.blinkType = BLINK_TYPE_NONE;
-                        } else {
-                            _ledsContext[ledIndex].nextActionTimestamp = xTaskGetTickCount() + pdMS_TO_TICKS(_ledsContext[ledIndex].ledParams.blinkPeriodMs / 2);
-                            _ledsContext[ledIndex].nextColor = (_ledsContext[ledIndex].nextColor == LED_COLOR_BLACK) ? _ledsContext[ledIndex].ledParams.rgbColor : LED_COLOR_BLACK;
-                        }
+        /* In any case, check blinking leds */
+        atLeastOneLedBlinking = false;
+        for (ledIndex = 0; ledIndex < MAX_REGISTERED_LEDS; ledIndex++) {
+            if (_ledsContext[ledIndex].ledParams.blinkType != BLINK_TYPE_NONE) {
+                atLeastOneLedBlinking = true;
+                if (xTaskGetTickCount() > _ledsContext[ledIndex].nextActionTimestamp) {
+                    _setLed(ledIndex, _ledsContext[ledIndex].nextColor, _ledsContext[ledIndex].ledParams.fade, _ledsContext[ledIndex].ledParams.delayToFade);
+                    if (_ledsContext[ledIndex].ledParams.blinkType == BLINK_TYPE_ONCE) {
+                        _ledsContext[ledIndex].ledParams.blinkType = BLINK_TYPE_NONE;
+                    } else {
+                        _ledsContext[ledIndex].nextActionTimestamp = xTaskGetTickCount() + pdMS_TO_TICKS(_ledsContext[ledIndex].ledParams.blinkPeriodMs / 2);
+                        _ledsContext[ledIndex].nextColor = (_ledsContext[ledIndex].nextColor == LED_COLOR_BLACK) ? _ledsContext[ledIndex].ledParams.rgbColor : LED_COLOR_BLACK;
                     }
                 }
             }
-            if (!atLeastOneLedBlinking) {
-                xTimerStop(_blinkingTimer, TASK_DEFAULT_REPONSE_TIME_TICKS);
-            }
-            break;
-
-        default:
-            break;
+        }
+        if (!atLeastOneLedBlinking) {
+            ticksToBlock = portMAX_DELAY;
         }
     }
 }
@@ -257,13 +251,4 @@ static void _setLed(uint8_t handle, uint32_t rgbColor, bool fade, uint32_t fadeD
             }
         }
     }
-}
-
-static void _blinkingTimerCallback(TimerHandle_t timer)
-{
-    ledEvent_t event = { 0 };
-
-    event.type = EVENT_CHECK_LEDS;
-
-    xQueueSend(_queueForLeds, &event, 0);
 }
