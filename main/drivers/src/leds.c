@@ -36,9 +36,6 @@ typedef enum {
     EVENT_REGISTER,
     EVENT_SET_SOLID,
     EVENT_SET_BLINKING,
-    EVENT_SET_FLASH,
-    EVENT_CHECK_LEDS,
-    EVENT_SET_OFF,
 } ledEvent_e;
 
 /* ____________________________________________________________________________ */
@@ -53,7 +50,7 @@ typedef struct {
     uint32_t rgbColor;
     bool fade;
     uint32_t delayToFade;
-    blinkType_e blinkType;
+    uint32_t blinkCount;
     uint32_t blinkPeriodMs;
 } ledParam_t;
 
@@ -150,7 +147,7 @@ void vLED_Process(void* pvParameters)
                 break;
 
             case EVENT_SET_SOLID:
-                _ledsContext[event.ledHandle].ledParams.blinkType = BLINK_TYPE_NONE;
+                _ledsContext[event.ledHandle].ledParams.blinkCount = 0;
                 _setLed(event.ledHandle, event.params.rgbColor, event.params.fade, event.params.delayToFade);
                 break;
 
@@ -162,16 +159,15 @@ void vLED_Process(void* pvParameters)
         /* In any case, check blinking leds */
         atLeastOneLedBlinking = false;
         for (ledIndex = 0; ledIndex < MAX_REGISTERED_LEDS; ledIndex++) {
-            if (_ledsContext[ledIndex].ledParams.blinkType != BLINK_TYPE_NONE) {
+            if (_ledsContext[ledIndex].ledParams.blinkCount != 0) {
                 atLeastOneLedBlinking = true;
                 if (xTaskGetTickCount() > _ledsContext[ledIndex].nextActionTimestamp) {
                     _setLed(ledIndex, _ledsContext[ledIndex].nextColor, _ledsContext[ledIndex].ledParams.fade, _ledsContext[ledIndex].ledParams.delayToFade);
-                    if (_ledsContext[ledIndex].ledParams.blinkType == BLINK_TYPE_ONCE) {
-                        _ledsContext[ledIndex].ledParams.blinkType = BLINK_TYPE_NONE;
-                    } else {
-                        _ledsContext[ledIndex].nextActionTimestamp = xTaskGetTickCount() + pdMS_TO_TICKS(_ledsContext[ledIndex].ledParams.blinkPeriodMs / 2);
-                        _ledsContext[ledIndex].nextColor = (_ledsContext[ledIndex].nextColor == LED_COLOR_BLACK) ? _ledsContext[ledIndex].ledParams.rgbColor : LED_COLOR_BLACK;
+                    if ((_ledsContext[ledIndex].ledParams.blinkCount != BLINK_CONTINIOUSLY) && (_ledsContext[ledIndex].nextColor == LED_COLOR_BLACK)) {
+                        _ledsContext[ledIndex].ledParams.blinkCount--;
                     }
+                    _ledsContext[ledIndex].nextActionTimestamp = xTaskGetTickCount() + pdMS_TO_TICKS(_ledsContext[ledIndex].ledParams.blinkPeriodMs / 2);
+                    _ledsContext[ledIndex].nextColor = (_ledsContext[ledIndex].nextColor == LED_COLOR_BLACK) ? _ledsContext[ledIndex].ledParams.rgbColor : LED_COLOR_BLACK;
                 }
             }
         }
@@ -212,7 +208,7 @@ void vLED_SetLedSolid(uint8_t ledHandle, uint32_t color, bool fade, uint32_t del
     xQueueSend(_queueForLeds, &event, WRITE_IN_QUEUE_DEFAULT_TIMEOUT);
 }
 
-void vLED_SetLedBlinking(uint8_t ledHandle, uint32_t color, bool fade, uint32_t delayToFadeMs, uint32_t periodMs, blinkType_e blinkType)
+void vLED_SetLedBlinking(uint8_t ledHandle, uint32_t color, bool fade, uint32_t delayToFadeMs, uint32_t periodMs, uint32_t blinkCount)
 {
     ledEvent_t event = { 0 };
 
@@ -220,7 +216,7 @@ void vLED_SetLedBlinking(uint8_t ledHandle, uint32_t color, bool fade, uint32_t 
     event.ledHandle = ledHandle;
     event.params.rgbColor = color;
     event.params.blinkPeriodMs = periodMs;
-    event.params.blinkType = blinkType;
+    event.params.blinkCount = blinkCount;
     event.params.fade = fade;
     event.params.delayToFade = delayToFadeMs;
 
